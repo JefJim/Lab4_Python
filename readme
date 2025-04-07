@@ -1,0 +1,5 @@
+#instalar dependencias antes de ejectuar
+pip install pandas numpy matplotlib seaborn scikit-learn openpyxl
+
+#luego ejectuar
+python app.py
