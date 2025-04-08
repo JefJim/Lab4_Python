@@ -10,7 +10,7 @@ from sklearn.preprocessing import StandardScaler, MinMaxScaler, LabelEncoder
 from sklearn.impute import SimpleImputer
 
 # 2. Cargar conjunto de datos desde GitHub
-url = "https://raw.githubusercontent.com/tu_usuario/tu_repositorio/main/datos.csv"
+url = "https://github.com/JefJim/Lab4_Python/blob/main/demographic-and-socioeconomic-statistics-indicators-for-costa-rica-13.csv"
 try:
     df = pd.read_csv(url)
     print("Datos cargados exitosamente desde GitHub")
