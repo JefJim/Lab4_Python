@@ -1,6 +1,6 @@
 #15. Laboratorio #4 - Minería de Datos
 # Universidad Técnica Nacional
-# Integrantes del grupo: [Nombre1, Nombre2, Nombre3]
+# Integrantes del grupo: [Jefry Jiménez Rocha, Diego Francisco Umaña Salas, Marleny Molina Sobalvarro]
 
 import pandas as pd
 import numpy as np
