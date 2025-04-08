@@ -1,164 +1,156 @@
+# Laboratorio #4 - Minería de Datos
+# Universidad Técnica Nacional
+# Integrantes del grupo: [Nombre1, Nombre2, Nombre3]
 
-# Importación de bibliotecas necesarias
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
-from sklearn.preprocessing import StandardScaler, LabelEncoder
+from sklearn.preprocessing import StandardScaler, MinMaxScaler, LabelEncoder
 from sklearn.impute import SimpleImputer
 
-# Configuración de visualización
-plt.style.use('ggplot')
-plt.rcParams['figure.figsize'] = (12, 6)
-pd.set_option('display.max_columns', None)
+# 2. Cargar conjunto de datos desde GitHub
+url = "https://raw.githubusercontent.com/tu_usuario/tu_repositorio/main/datos.csv"
+try:
+    df = pd.read_csv(url)
+    print("Datos cargados exitosamente desde GitHub")
+except Exception as e:
+    print(f"Error al cargar datos: {e}")
+    # Cargar datos locales en caso de error
+    df = pd.read_csv("datos_backup.csv")
 
-# 1. Lectura del conjunto de datos desde GitHub
-url_excel = "https://github.com/JefJim/Lab4_Python/raw/main/Estad%C3%ADsticas%20Policiales%202020.xlsx"
-df = pd.read_excel(url_excel)
-
-# 2. Visualización de características básicas del conjunto de datos
-print("\n=== Información básica del dataset ===")
-print(f"Filas: {df.shape[0]}, Columnas: {df.shape[1]}")
+# 4. Visualizar características básicas del conjunto de datos
+print("\n=== Características básicas del dataset ===")
+print(f"Dimensiones del dataset: {df.shape}")
 print("\nPrimeras 5 filas:")
 print(df.head())
 print("\nResumen estadístico:")
-print(df.describe(include='all'))
+print(df.describe())
+print("\nInformación del dataset:")
+print(df.info())
 
-# 3. Verificación de nombres de columnas
-print("\nNombres de columnas actuales:")
-print(df.columns.tolist())
+# 5. Cambiar nombres de columnas a español
+# Asumiendo que el dataset original está en inglés
+nombres_espanol = {
+    'column1': 'columna1',
+    'column2': 'columna2',
+    # ... agregar todas las columnas
+}
+df = df.rename(columns=nombres_espanol)
+print("\nNombres de columnas en español:")
+print(df.columns)
 
-# 4. Detección de valores nulos con evidencia gráfica
-print("\nValores nulos por columna:")
+# 6. Determinar valores nulos con evidencia gráfica
+print("\n=== Valores nulos ===")
+print("Cantidad de valores nulos por columna:")
 print(df.isnull().sum())
 
-# Porcentaje de nulos por columna
-nulos = df.isnull().mean() * 100
-nulos = nulos[nulos > 0]  # Solo muestra columnas con nulos
-
-if df.isnull().sum().sum() == 0:
-    print("✅ No hay valores nulos en el dataset.")
-else:
-    # Solo grafica si hay nulos
-    nulos = df.isnull().mean() * 100
-    nulos = nulos[nulos > 0]
-    
-    if not nulos.empty:
-        plt.figure(figsize=(10, 4))
-        nulos.plot(kind='bar', color='red', edgecolor='black')
-        plt.title("Porcentaje de valores nulos por columna")
-        plt.ylabel("Porcentaje de nulos (%)")
-        plt.xticks(rotation=45)
-        plt.grid(axis='y', linestyle='--')
-        plt.tight_layout()
-        plt.show()
-    else:
-        print("✅ No hay columnas con valores nulos.")
-
-# 5. Limpieza y transformación de la columna Edad (categorías -> números)
-df['Edad'] = df['Edad'].astype(str).str.strip().str.lower()
-
-df['Edad'] = df['Edad'].astype(str).str.strip().str.lower().replace({
-    'menor de edad': 'Menor de edad',
-    'mayor de edad': 'Adulto',
-    'adulto mayor': 'Adulto mayor',
-    'desconocido': 'Desconocido'
-})
-plt.figure(figsize=(10, 8))
-colors = ['#FF6B6B', '#4ECDC4', '#FFD166', '#A5A5A5']  # Colores modernos
-explode = (0.05, 0.05, 0.05, 0.05)  # Separar ligeramente las porciones
-
-
-# 6. Detección de valores atípicos con evidencia gráfica
-patches, texts, autotexts = plt.pie(
-    df['Edad'].value_counts(),
-    labels=['Adulto', 'Menor de edad', 'Adulto mayor', 'Desconocido'],  # Etiquetas claras
-    autopct='%1.1f%%',
-    startangle=90,
-    colors=colors,
-    explode=explode,
-    textprops={'fontsize': 12},
-    pctdistance=0.8
-)
-plt.setp(autotexts, color='white', weight='bold')  # Porcentajes en blanco y negrita
-plt.setp(texts, fontsize=12, weight='bold')  # Etiquetas en negrita
-plt.title('Distribución por Grupo de Edad', pad=20, fontsize=14, weight='bold')
-plt.legend(
-    title="Categorías:",
-    loc="center left",
-    bbox_to_anchor=(1, 0.5),
-    labels=['Adulto (18-64 años)', 'Menor de edad (<18)', 'Adulto mayor (65+)', 'Desconocido']
-)
-
-# Ajustar layout y guardar
-plt.tight_layout()
-plt.savefig('distribucion_edad_mejorado.png', dpi=300, bbox_inches='tight')
+plt.figure(figsize=(10, 6))
+sns.heatmap(df.isnull(), cbar=False, cmap='viridis')
+plt.title("Mapa de calor de valores nulos")
+plt.savefig("valores_nulos.png")
 plt.show()
-# 7. Función para imputación de valores
-def imputar_valores(df, estrategia='mean'):
+
+# 7. Identificar valores atípicos con evidencia gráfica
+print("\n=== Valores atípicos ===")
+numeric_cols = df.select_dtypes(include=['int64', 'float64']).columns
+
+plt.figure(figsize=(15, 10))
+for i, col in enumerate(numeric_cols, 1):
+    plt.subplot(3, 3, i)
+    sns.boxplot(y=df[col])
+    plt.title(f"Boxplot de {col}")
+plt.tight_layout()
+plt.savefig("valores_atipicos.png")
+plt.show()
+
+# 8. Funciones para imputación de variables
+def imputar_nulos(df, estrategia='media'):
+    """Imputa valores nulos según la estrategia especificada"""
     imputer = SimpleImputer(strategy=estrategia)
+    df_imputado = pd.DataFrame(imputer.fit_transform(df.select_dtypes(include=['int64', 'float64'])), 
+                              columns=df.select_dtypes(include=['int64', 'float64']).columns)
     
+    for col in df.select_dtypes(exclude=['int64', 'float64']).columns:
+        df_imputado[col] = df[col].fillna(df[col].mode()[0])
+    
+    return df_imputado
+
+def manejar_atipicos(df, metodo='IQR'):
+    """Maneja valores atípicos usando el método IQR o Z-score"""
     numeric_cols = df.select_dtypes(include=['int64', 'float64']).columns
-    if not numeric_cols.empty:
-        df[numeric_cols] = imputer.fit_transform(df[numeric_cols])
     
-    cat_cols = df.select_dtypes(include=['object']).columns
-    if not cat_cols.empty:
-        imputer_cat = SimpleImputer(strategy='most_frequent')
-        df[cat_cols] = imputer_cat.fit_transform(df[cat_cols])
+    if metodo == 'IQR':
+        for col in numeric_cols:
+            Q1 = df[col].quantile(0.25)
+            Q3 = df[col].quantile(0.75)
+            IQR = Q3 - Q1
+            lower_bound = Q1 - 1.5 * IQR
+            upper_bound = Q3 + 1.5 * IQR
+            
+            # Opción 1: Eliminar atípicos
+            # df = df[(df[col] >= lower_bound) & (df[col] <= upper_bound)]
+            
+            # Opción 2: Winsorizar (reemplazar con los límites)
+            df[col] = np.where(df[col] < lower_bound, lower_bound, 
+                               np.where(df[col] > upper_bound, upper_bound, df[col]))
+    
+    elif metodo == 'Zscore':
+        for col in numeric_cols:
+            z_scores = (df[col] - df[col].mean()) / df[col].std()
+            df[col] = np.where(np.abs(z_scores) > 3, 
+                              np.sign(z_scores) * 3 * df[col].std() + df[col].mean(), 
+                              df[col])
     
     return df
 
-# 8. Imputación de valores faltantes
-df_imputado = imputar_valores(df.copy())
-print("\nValores nulos después de imputación:")
-print(df_imputado.isnull().sum())
+# Aplicar funciones de imputación
+df = imputar_nulos(df, estrategia='media')
+df = manejar_atipicos(df, metodo='IQR')
 
 # 9. Conversión de tipos de datos
-df_imputado['Fecha'] = pd.to_datetime(df_imputado['Fecha'], errors='coerce')
+for col in df.columns:
+    if df[col].dtype == 'object':
+        try:
+            df[col] = pd.to_datetime(df[col])
+            print(f"Columna {col} convertida a datetime")
+        except:
+            pass
 
 # 10. Conversión de variables categóricas a numéricas
-cat_cols = ['Delito', 'SubDelito', 'Victima', 'SubVictima', 'Genero', 'Nacionalidad', 'Provincia', 'Canton', 'Distrito']
-le = LabelEncoder()
-for col in cat_cols:
-    if col in df_imputado.columns:
-        df_imputado[col+'_encoded'] = le.fit_transform(df_imputado[col].astype(str))
+label_encoder = LabelEncoder()
+for col in df.select_dtypes(include=['object']).columns:
+    df[col] = label_encoder.fit_transform(df[col])
+    print(f"Columna categórica {col} convertida a numérica")
 
-# 11. Estandarización de datos numéricos
-numeric_cols = ['Edad']
+# 11. Estandarización o normalización
 scaler = StandardScaler()
-df_imputado[numeric_cols] = scaler.fit_transform(df_imputado[numeric_cols])
+numeric_cols = df.select_dtypes(include=['int64', 'float64']).columns
+df[numeric_cols] = scaler.fit_transform(df[numeric_cols])
 
-# 12. Análisis de correlación
-numeric_df = df_imputado.select_dtypes(include=['int64', 'float64'])
-corr_matrix = numeric_df.corr()
-
+# 12. Correlación de variables con evidencia gráfica
 plt.figure(figsize=(12, 8))
+corr_matrix = df.corr()
 sns.heatmap(corr_matrix, annot=True, cmap='coolwarm', center=0)
-plt.title("Matriz de correlación de variables numéricas")
+plt.title("Matriz de correlación")
 plt.savefig("correlacion.png")
 plt.show()
 
-# 13. Identificación de variable dependiente
-print("\nPosibles variables dependientes:")
-print("- Para clasificación: 'Delito' (predecir tipo de delito)")
-print("- Para regresión: 'Edad' (predecir edad de víctima, si hay patrones)")
+# 13. Identificar variable dependiente y modelo candidato
+# Asumimos que la última columna es la variable dependiente
+variable_dependiente = df.columns[-1]
+print(f"\nVariable dependiente identificada: {variable_dependiente}")
 
-# 14. Selección de modelo
-print("\nModelos candidatos:")
-print("1. Clasificación (predecir tipo de delito): Random Forest")
-print("2. Regresión (predecir edad de víctima): Random Forest Regressor")
+# Determinar si es problema de clasificación o regresión
+if df[variable_dependiente].nunique() < 10:  # Asumimos que es clasificación si hay pocos valores únicos
+    print("Problema de clasificación detectado")
+    modelo_recomendado = "Random Forest"
+else:
+    print("Problema de regresión detectado")
+    modelo_recomendado = "Regresión Lineal"
 
-# 15. Guardado del dataset procesado
-df_imputado.to_csv('data_process.csv', index=False)
+print(f"Modelo recomendado: {modelo_recomendado}")
+
+# 14. Guardar conjunto de datos procesado
+df.to_csv('data_process.csv', index=False)
 print("\nDataset procesado guardado como 'data_process.csv'")
-
-# 16. Documentación de integrantes del grupo
-print("""
-Integrantes del grupo:
-1. Jefry Jiménez Rocha - 208320789
-2. Diego - Carné
-3. Nombre Apellido - Carné
-
-Fecha de entrega: DD/MM/AAAA
-""")
