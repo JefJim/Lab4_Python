@@ -14,13 +14,13 @@ from sklearn.impute import SimpleImputer
 # 3. Cargar conjunto de datos desde GitHub
 url = "https://raw.githubusercontent.com/JefJim/Lab4_Python/main/Costa%20Rica%20Total%20deceases%202014%20-%202021.csv"
 try:
-    df = pd.read_csv(url, encoding='latin-1')  # Usamos latin-1 por posibles caracteres especiales
+    df = pd.read_csv(url, encoding='utf-8-sig')
     print("Datos cargados exitosamente desde GitHub")
 except Exception as e:
     print(f"Error al cargar datos: {e}")
     # Cargar datos locales en caso de error
-    df = pd.read_csv("Costa Rica Total deceases 2014 - 2021.csv", encoding='latin-1')
-
+    df = pd.read_csv("Costa Rica Total deceases 2014 - 2021.csv", encoding='utf-8-sig')
+    
 # Limpieza inicial: eliminar filas totalmente vacías si las hay
 df = df.dropna(how='all')
 
@@ -92,6 +92,19 @@ else:
     plt.savefig("valores_nulos.png")
     plt.show()
 
+# Crear un diccionario de diccionarios
+frecuencia_por_columna = {}
+
+# Recorremos cada columna del DataFrame
+for columna in df.columns:
+    conteo = df[columna].value_counts().to_dict()
+    frecuencia_por_columna[columna] = conteo
+
+# Mostrar ejemplo con algunas columnas
+for col in list(frecuencia_por_columna.keys())[:4]:  # Solo muestra las primeras 5 columnas para visualizar
+    print(f"\n📊 Frecuencias en la columna: {col}")
+    print(frecuencia_por_columna[col])
+
 
 # 7. Identificar valores atípicos solo en columnas numéricas
 print("\n🔢 Identificación de columnas numéricas:")
@@ -114,63 +127,8 @@ else:
     plt.savefig("valores_atipicos.png")
     plt.show()
 
-# 8. Funciones para imputación de variables (adaptadas para este dataset)
-def imputar_nulos(df):
-    """Imputa valores nulos según el tipo de columna"""
-    # Para columnas numéricas
-    df['Total_defunciones'] = df['Total_defunciones'].fillna(df['Total_defunciones'].median())
-    df['edad'] = df['edad'].fillna(df['edad'].median())
-    
-    # Para columnas categóricas
-    cat_cols = ['sexo', 'estado_civil', 'provincia', 'distrito_residencia', 'nacionalidad', 'descripción_causa_muerte']
-    for col in cat_cols:
-        df[col] = df[col].fillna('Desconocido')
-    
-    return df
 
-def manejar_atipicos(df):
-    """Maneja valores atípicos usando el método IQR"""
-    # Solo aplicamos a 'Total_defunciones' y 'Edad'
-    for col in ['Total_defunciones', 'edad']:
-        Q1 = df[col].quantile(0.25)
-        Q3 = df[col].quantile(0.75)
-        IQR = Q3 - Q1
-        lower_bound = Q1 - 1.5 * IQR
-        upper_bound = Q3 + 1.5 * IQR
-        
-        # Winsorizar (reemplazar con los límites)
-        df[col] = np.where(df[col] < lower_bound, lower_bound, 
-                          np.where(df[col] > upper_bound, upper_bound, df[col]))
-    
-    return df
 
-# Aplicar funciones de imputación
-df = imputar_nulos(df)
-df = manejar_atipicos(df)
-
-# 9. Conversión de tipos de datos
-df['anio'] = df['anio'].astype('int')
-df['mes'] = df['mes'].astype('category')  # Mes es categórico ordinal
-
-# 10. Conversión de variables categóricas a numéricas (solo las necesarias)
-# Para este dataset, podríamos no convertir todas ya que muchas son descriptivas
-label_encoder = LabelEncoder()
-cols_to_encode = ['sexo', 'estado_civil', 'provincia', 'distrito_residencia', 'nacionalidad']
-for col in cols_to_encode:
-    df[col+'_encoded'] = label_encoder.fit_transform(df[col])
-
-# 11. Estandarización solo de las columnas numéricas continuas
-scaler = StandardScaler()
-df[['Total_defunciones', 'edad']] = scaler.fit_transform(df[['Total_defunciones', 'edad']])
-
-# 12. Correlación de variables (solo numéricas)
-numeric_cols_for_corr = ['Total_defunciones', 'edad', 'anio'] + [col for col in df.columns if '_encoded' in col]
-plt.figure(figsize=(15, 10))
-corr_matrix = df[numeric_cols_for_corr].corr()
-sns.heatmap(corr_matrix, annot=True, cmap='coolwarm', center=0, fmt=".2f")
-plt.title("Matriz de correlación")
-plt.savefig("correlacion.png")
-plt.show()
 
 # 13. Identificar variable dependiente y modelo candidato
 # En este caso, 'Total_defunciones' podría ser la variable dependiente
@@ -182,29 +140,7 @@ print("Problema de regresión detectado (predicción de cantidad de defunciones)
 modelo_recomendado = "Random Forest Regressor"
 print(f"Modelo recomendado: {modelo_recomendado} (por su capacidad para manejar múltiples predictores)")
 
-# 14. Guardar conjunto de datos procesado
-def corregir_caracteres(texto):
-    if isinstance(texto, str):
-        return texto.replace('Ã', 'í')
-    return texto
-
-# Aplicar la corrección a todas las columnas de tipo objeto (strings)
-for columna in df.select_dtypes(include=['object']).columns:
-    df[columna] = df[columna].apply(corregir_caracteres)
-
-# Verificación de resultados
-print("\n🔍 Verificación de corrección de caracteres:")
-# Mostrar algunas filas que contenían el problema (si existen)
-filas_con_problema = df.apply(lambda row: row.astype(str).str.contains('Ã').any(), axis=1)
-if filas_con_problema.any():
-    print("Se encontraron y corrigieron caracteres 'Ã' en las siguientes filas:")
-    print(df[filas_con_problema].head())
-else:
-    print("✅ No se encontraron más caracteres 'Ã' en el dataset")
-
-# Guardar el dataset corregido
-df.to_csv('datos_corregidos.csv', index=False, encoding='utf-8-sig')
-print("\n💾 Dataset con caracteres corregidos guardado como 'datos_corregidos.csv'")
+# 14. Guardar el dataset procesado
 df.to_csv('data_process.csv', index=False)
 print("\nDataset procesado guardado como 'data_process.csv'")
 
