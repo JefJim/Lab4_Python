@@ -1,5 +1,10 @@
 #instalar dependencias antes de ejectuar
 #pip install pandas numpy matplotlib seaborn scikit-learn openpyxl
 
-#luego ejectuar
-#python app.py
+#ejecutar primero
+#python lab4_app.py
+
+#y seguidamente ejecutar
+#python MachineLearning.py 
+
+#se hicieron en archivos separados debido a cantidad de líneas y facilidad de lectura
