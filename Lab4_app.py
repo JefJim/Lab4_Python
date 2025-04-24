@@ -47,7 +47,7 @@ nombres_espanol = {
     'pc': 'distrito_residencia',
     'IU': 'indice_urbanizacion',
     'causamuer': 'codigo_causa_muerte',
-    'des_causa': 'descripción_causa_muerte',
+    'des_causa': 'descripcion_causa_muerte',
     'autopsia': 'autopsia',
     'asistmed': 'asistencia_medica',
     'instmurio': 'lugar_muerte',
@@ -69,11 +69,10 @@ nombres_espanol = {
 df = df.rename(columns=nombres_espanol)
 print("\nNombres de columnas estandarizados:")
 print(df.columns)
-df['Total_defunciones'] = 1  # Cada registro representa 1 defunción
-total_defunciones = len(df)
-print(f"\n📌 Total de defunciones registradas: {total_defunciones:,}")
 # 6. Determinar valores nulos con evidencia gráfica
 print("\n=== Verificación de valores nulos ===")
+print("\n=== Valores nulos por columna ===")
+print(df.isnull().sum())
 if df.isnull().sum().sum() == 0:
     print("✅ No se encontraron valores nulos en el dataset")
     # Crear un gráfico indicando que no hay nulos
@@ -91,20 +90,6 @@ else:
     plt.title("Mapa de calor de valores nulos")
     plt.savefig("valores_nulos.png")
     plt.show()
-
-# Crear un diccionario de diccionarios
-frecuencia_por_columna = {}
-
-# Recorremos cada columna del DataFrame
-for columna in df.columns:
-    conteo = df[columna].value_counts().to_dict()
-    frecuencia_por_columna[columna] = conteo
-
-# Mostrar ejemplo con algunas columnas
-for col in list(frecuencia_por_columna.keys())[:4]:  # Solo muestra las primeras 5 columnas para visualizar
-    print(f"\n📊 Frecuencias en la columna: {col}")
-    print(frecuencia_por_columna[col])
-
 
 # 7. Identificar valores atípicos solo en columnas numéricas
 print("\n🔢 Identificación de columnas numéricas:")
@@ -127,18 +112,68 @@ else:
     plt.savefig("valores_atipicos.png")
     plt.show()
 
+#8. Funciones para imputación de variables (adaptadas para este dataset)
+def imputar_nulos(df):
+    """Imputa valores nulos para preparar el dataset para clasificación."""
+    # Columnas numéricas
+    num_cols = ['edad', 'anio', 'indice_urbanizacion', 'dia_defuncion', 'anio_defuncion', 'dia_declaracion', 'anio_declaracion', 'grupo_to17']
+    for col in num_cols:
+        df[col] = df[col].fillna(df[col].median())
+    
+    # Columnas categóricas clave para clasificación
+    cat_cols = ['sexo', 'estado_civil', 'provincia', 'descripcion_causa_muerte']
+    for col in cat_cols:
+        df[col] = df[col].fillna('Desconocido')
+    
+    return df
 
+def manejar_atipicos(df):
+    """Maneja valores atípicos usando el método IQR"""
+    # Solo aplicamos a 'Total_defunciones' y 'Edad'
+    for col in ['edad', 'anio', 'indice_urbanizacion', 'dia_defuncion', 'anio_defuncion', 'dia_declaracion', 'anio_declaracion', 'grupo_to17']:
+        Q1 = df[col].quantile(0.25)
+        Q3 = df[col].quantile(0.75)
+        IQR = Q3 - Q1
+        lower_bound = Q1 - 1.5 * IQR
+        upper_bound = Q3 + 1.5 * IQR
+        
+        # Winsorizar (reemplazar con los límites)
+        df[col] = np.where(df[col] < lower_bound, lower_bound, 
+                          np.where(df[col] > upper_bound, upper_bound, df[col]))
+    
+    return df
 
+#Aplicar funciones de imputación
+df = imputar_nulos(df)
+df = manejar_atipicos(df)
+
+#Análisis de la variable dependiente: descripcion_causa_muerte
+print("\n=== Análisis de la variable dependiente (descripcion_causa_muerte) ===")
+print("Distribución de causas de muerte:")
+print(df['descripcion_causa_muerte'].value_counts().head(10))  # Top 10 causas
+
+# Visualización de las causas más frecuentes
+plt.figure(figsize=(12, 6))
+df['descripcion_causa_muerte'].value_counts().head(10).plot(kind='bar', color='skyblue')
+plt.title('Top 10 causas de muerte en Costa Rica (2014-2021)')
+plt.xlabel('Causa de muerte')
+plt.ylabel('Frecuencia')
+plt.xticks(rotation=45, ha='right')
+plt.tight_layout()
+plt.savefig("top10_causas_muerte.png")
+plt.show()
 
 # 13. Identificar variable dependiente y modelo candidato
 # En este caso, 'Total_defunciones' podría ser la variable dependiente
-variable_dependiente = 'Total_defunciones'
-print(f"\nVariable dependiente identificada: {variable_dependiente}")
+le = LabelEncoder()
+df['causa_muerte_codificada'] = le.fit_transform(df['descripcion_causa_muerte'])
 
-# Dado que 'Total_defunciones' es numérica continua, sería un problema de regresión
-print("Problema de regresión detectado (predicción de cantidad de defunciones)")
-modelo_recomendado = "Random Forest Regressor"
-print(f"Modelo recomendado: {modelo_recomendado} (por su capacidad para manejar múltiples predictores)")
+# Identificación del problema y modelo recomendado
+variable_dependiente = 'descripcion_causa_muerte'
+print(f"\nVariable dependiente seleccionada: {variable_dependiente}")
+print("Tipo de problema: Clasificación multiclase")
+modelo_recomendado = "Random Forest Classifier"
+print(f"Modelo recomendado: {modelo_recomendado} (por su manejo de variables categóricas y robustez)")
 
 # 14. Guardar el dataset procesado
 df.to_csv('data_process.csv', index=False)
