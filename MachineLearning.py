@@ -1,33 +1,43 @@
-import pandas as pd
+import warnings
 import numpy as np
+import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
-from sklearn.preprocessing import StandardScaler, MinMaxScaler, LabelEncoder
-from sklearn.impute import SimpleImputer
+from sklearn.preprocessing import LabelEncoder
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import classification_report, accuracy_score
-from sklearn.linear_model import LinearRegression
-from sklearn.metrics import mean_squared_error, r2_score
 from sklearn.preprocessing import LabelEncoder
 import matplotlib.pyplot as plt
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
+from sklearn.cluster import KMeans
+from sklearn.preprocessing import StandardScaler
+from sklearn.pipeline import Pipeline
 
 #1. Usar  python
 #2 Utilice el conjunto de datos, de su elección
 # 3. Cargar conjunto de datos desde GitHub
 url = "https://raw.githubusercontent.com/JefJim/Lab4_Python/main/Costa%20Rica%20Total%20deceases%202014%20-%202021.csv"
-try:
-    df = pd.read_csv(url, encoding='utf-8-sig')
-    print("Datos cargados exitosamente desde GitHub")
 
+dtype_dict = {28: str}  # Ajusta el índice según tu CSV
+try:
+    df = pd.read_csv(
+        url,
+        encoding='utf-8-sig',
+        dtype=dtype_dict,
+        low_memory=False
+    )
+    print("Datos cargados exitosamente desde GitHub")
 except Exception as e:
     print(f"Error al cargar datos: {e}")
-    # Cargar datos locales en caso de error
-    df = pd.read_csv("Costa Rica Total deceases 2014 - 2021.csv", encoding='utf-8-sig')
+    df = pd.read_csv(
+        "Costa Rica Total deceases 2014 - 2021.csv",
+        encoding='utf-8-sig',
+        dtype=dtype_dict,
+        low_memory=False
+    )
 # Limpieza inicial: eliminar filas totalmente vacías si las hay
 df = df.dropna(how='all')
-
 # Crear una instancia de LabelEncoder
 le = LabelEncoder()
 nombres_espanol = {
@@ -73,40 +83,6 @@ df['nacionalidad_encoded'] = le.fit_transform(df['nacionalidad'])
 df['distrito_residencia_encoded'] = le.fit_transform(df['distrito_residencia'])
 df['causa_muerte_encoded'] = le.fit_transform(df['descripcion_causa_muerte'])
 df['provincia_muerte_encoded'] = LabelEncoder().fit_transform(df['provincia_muerte'].astype(str))
-
-# 8. Funciones para imputación de variables (adaptadas para este dataset)
-# def imputar_nulos(df):
-#     """Imputa valores nulos según el tipo de columna"""
-#     # Para columnas numéricas
-#     df['Total_defunciones'] = df['Total_defunciones'].fillna(df['Total_defunciones'].median())
-#     df['edad'] = df['edad'].fillna(df['edad'].median())
-    
-#     # Para columnas categóricas
-#     cat_cols = ['sexo', 'estado_civil', 'provincia', 'distrito_residencia', 'nacionalidad', 'descripción_causa_muerte']
-#     for col in cat_cols:
-#         df[col] = df[col].fillna('Desconocido')
-    
-#     return df
-
-# def manejar_atipicos(df):
-#     """Maneja valores atípicos usando el método IQR"""
-#     # Solo aplicamos a 'Total_defunciones' y 'Edad'
-#     for col in ['Total_defunciones', 'edad']:
-#         Q1 = df[col].quantile(0.25)
-#         Q3 = df[col].quantile(0.75)
-#         IQR = Q3 - Q1
-#         lower_bound = Q1 - 1.5 * IQR
-#         upper_bound = Q3 + 1.5 * IQR
-        
-#         # Winsorizar (reemplazar con los límites)
-#         df[col] = np.where(df[col] < lower_bound, lower_bound, 
-#                           np.where(df[col] > upper_bound, upper_bound, df[col]))
-    
-#     return df
-
-# Aplicar funciones de imputación
-#df = imputar_nulos(df)
-#df = manejar_atipicos(df)
 
 
 # 9. Conversión de tipos de datos
@@ -344,3 +320,207 @@ plt.savefig("grafico_causa_muertes_comunes_grupoedad.png")
 plt.tight_layout()
 plt.show()
 #predecir la causa de muerte basándonos en grupo etario, sexo, estado civil, provincia y atención médica
+
+#modelo K-means
+# Crear fecha de muerte con formato correcto
+warnings.filterwarnings("ignore", category=UserWarning, module="joblib")
+
+def preparar_datos_kmeans(df):
+    """Función mejorada para preparar datos para K-means"""
+    
+    # 1. Mapeo de meses textuales a numéricos
+    meses_a_numero = {
+        'Enero': 1, 'Febrero': 2, 'Marzo': 3, 'Abril': 4, 'Mayo': 5, 'Junio': 6,
+        'Julio': 7, 'Agosto': 8, 'Septiembre': 9, 'Octubre': 10, 'Noviembre': 11, 'Diciembre': 12
+    }
+    
+    # 2. Convertir meses de texto a número
+    df['mes_num'] = df['mes_defuncion'].map(meses_a_numero)
+    
+    # 3. Crear fecha de muerte con manejo robusto
+    def crear_fecha_segura(anio, mes, dia):
+        try:
+            anio = int(float(anio))
+            mes = int(float(mes))
+            dia = int(float(dia))
+            
+            if mes < 1 or mes > 12 or dia < 1 or dia > 31:
+                return pd.NaT
+                
+            return pd.to_datetime(f"{anio}-{mes}-{dia}", errors='coerce', format='%Y-%m-%d')
+        except:
+            return pd.NaT
+    
+    df['fecha_muerte'] = df.apply(
+        lambda x: crear_fecha_segura(x['anio_defuncion'], x['mes_num'], x['dia_defuncion']), 
+        axis=1
+    )
+    
+    # 4. Filtrar filas con fechas válidas
+    df_validos = df.dropna(subset=['fecha_muerte']).copy()
+    
+    if df_validos.empty:
+        raise ValueError("No hay registros válidos después del filtrado de fechas")
+    
+    # 5. Crear características asegurando misma longitud
+    features = pd.DataFrame({
+        'edad': df_validos['edad'],
+        'mes_muerte': df_validos['fecha_muerte'].dt.month,
+        'hora_pico': ((df_validos['fecha_muerte'].dt.hour >= 8) & 
+                     (df_validos['fecha_muerte'].dt.hour <= 18)).astype(int),
+        'urbanizacion': pd.to_numeric(df_validos['indice_urbanizacion'], errors='coerce').fillna(0),
+        'asistencia_medica': df_validos['asistencia_medica'].map({'Sí': 1, 'No': 0}).fillna(0),
+        'sexo_num': df_validos['sexo'].map({'Hombres': 1, 'Mujeres': 0}).fillna(0),
+        'provincia_num': pd.factorize(df_validos['provincia_muerte'])[0]
+    }, index=df_validos.index)  # Mantener mismo índice
+    
+    # 6. One-hot encoding para causas de muerte
+    causas = df_validos['grupo_to63'].astype(str).str[:3].replace('nan', 'XXX')
+    causas_encoded = pd.get_dummies(causas, prefix='causa')
+    
+    # Asegurar que todas las filas estén alineadas
+    features = pd.concat([features, causas_encoded], axis=1).dropna()
+    
+    return features, df_validos
+
+def entrenar_kmeans(df, n_clusters=5):
+    """Función mejorada para entrenar K-means"""
+    
+    try:
+        # 1. Preparar datos
+        X, df_validos = preparar_datos_kmeans(df)
+        
+        print(f"\nDatos preparados correctamente. Registros válidos: {len(X)}/{len(df)}")
+        
+        # 2. Ajustar número de clusters si es necesario
+        if len(X) < n_clusters:
+            n_clusters = max(2, min(5, len(X) // 2))
+            print(f"Ajustando número de clusters a {n_clusters} por tamaño de muestra")
+        
+        # 3. Pipeline con escalado y K-means
+        pipeline = Pipeline([
+            ('scaler', StandardScaler()),
+            ('kmeans', KMeans(
+                n_clusters=n_clusters,
+                random_state=42,
+                n_init='auto',
+                init='k-means++'
+            ))
+        ])
+        
+        # 4. Entrenar modelo
+        clusters = pipeline.fit_predict(X)
+        
+        # 5. Asignar clusters solo a las filas válidas
+        df['cluster'] = np.nan
+        df.loc[df_validos.index, 'cluster'] = clusters
+        
+        # 6. Analizar resultados
+        analizar_clusters(df[df['cluster'].notna()])
+        
+        return pipeline
+        
+    except Exception as e:
+        print(f"\n❌ Error durante el entrenamiento: {str(e)}")
+        print("Posibles acciones:")
+        print("- Verifica que los nombres de meses estén en español y correctamente escritos")
+        print("- Revisa que los valores de día y año sean números válidos")
+        print("- Comprueba que haya suficientes registros después del filtrado")
+        return None
+
+def analizar_clusters(df):
+    """Función corregida para analizar los clusters resultantes"""
+    
+    if 'cluster' not in df.columns:
+        print("Error: No se encontró la columna 'cluster' en el DataFrame")
+        return None
+    
+    # Verificar que hay clusters asignados
+    if df['cluster'].isna().all():
+        print("Error: Todos los valores en 'cluster' son NA/nulos")
+        return None
+    
+    print("\nAnálisis de Clusters:")
+    print("="*50)
+    
+    # Estadísticas por cluster
+    cluster_stats = df.groupby('cluster').agg({
+        'edad': ['mean', 'std'],
+        'sexo': lambda x: (x == 'Hombres').mean(),
+        'asistencia_medica': lambda x: (x == 'Sí').mean(),
+        'provincia_muerte': lambda x: x.mode()[0] if not x.mode().empty else 'N/A',
+        'descripcion_causa_muerte': lambda x: x.mode()[0] if not x.mode().empty else 'N/A',
+        'fecha_muerte': lambda x: x.dt.month.mode()[0] if not x.dt.month.mode().empty else 0
+    })
+    
+    # Renombrar columnas para mejor visualización
+    cluster_stats.columns = [
+        'Edad Promedio', 'Desviación Edad',
+        '% Masculino', 
+        '% con Asistencia Médica',
+        'Provincia Más Común',
+        'Causa Principal',
+        'Mes Más Común'
+    ]
+    
+    # Mostrar estadísticas
+    print(cluster_stats)
+    
+    # Distribución de clusters
+    print("\nDistribución de registros por cluster:")
+    print(df['cluster'].value_counts().sort_index())
+    
+    return cluster_stats  # Retornamos las estadísticas para uso posterior
+# Entrenar el modelo
+# 1. Verificar datos antes de procesar
+# 2. Verificar datos iniciales
+print("Total de registros iniciales:", len(df))
+print("Muestra de meses:", df['mes_defuncion'].unique()[:5])
+def visualizar_clusters(cluster_stats):
+    """Función para visualizar las estadísticas de clusters"""
+    if cluster_stats is None:
+        print("No hay datos para visualizar")
+        return
+    
+    plt.figure(figsize=(12, 8))
+    
+    # Gráfico de edades por cluster
+    plt.subplot(2, 2, 1)
+    cluster_stats['Edad Promedio'].plot(kind='bar', title='Edad Promedio por Cluster')
+    plt.ylabel('Edad')
+    
+    # Gráfico de distribución por sexo
+    plt.subplot(2, 2, 2)
+    cluster_stats['% Masculino'].plot(kind='bar', title='% Masculino por Cluster')
+    plt.ylabel('Porcentaje')
+    
+    # Gráfico de asistencia médica
+    plt.subplot(2, 2, 3)
+    cluster_stats['% con Asistencia Médica'].plot(kind='bar', title='Asistencia Médica por Cluster')
+    plt.ylabel('Porcentaje')
+    
+    # Gráfico de meses más comunes
+    plt.subplot(2, 2, 4)
+    cluster_stats['Mes Más Común'].plot(kind='bar', title='Mes Más Común por Cluster')
+    plt.ylabel('Mes (1-12)')
+    
+    plt.tight_layout()
+    plt.show()
+# 3. Entrenar modelo
+modelo_kmeans = entrenar_kmeans(df, n_clusters=5)
+
+# 4. Usar resultados
+if modelo_kmeans is not None:
+    print("\nModelo entrenado exitosamente!")
+    stats = analizar_clusters(df[df['cluster'].notna()])
+    if stats is not None:
+        visualizar_clusters(stats)
+    # Guardar resultados
+    df.to_csv('datos_con_clusters.csv', index=False)
+    
+    # Filtrar solo registros con cluster asignado
+    df_con_clusters = df[df['cluster'].notna()]
+    print("\nMuestra de resultados:")
+    print(df_con_clusters[['edad', 'sexo', 'provincia_muerte', 'descripcion_causa_muerte', 'cluster']].head())
+else:
+    print("\nNo se pudo entrenar el modelo. Revisa los mensajes de error.")
