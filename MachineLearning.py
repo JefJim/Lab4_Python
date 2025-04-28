@@ -385,7 +385,6 @@ def preparar_datos_kmeans(df):
 
 def entrenar_kmeans(df, n_clusters=5):
     """Función mejorada para entrenar K-means"""
-    
     try:
         # 1. Preparar datos
         X, df_validos = preparar_datos_kmeans(df)
@@ -462,10 +461,6 @@ def analizar_clusters(df):
         'Causa Principal',
         'Mes Más Común'
     ]
-    
-    # Mostrar estadísticas
-    print(cluster_stats)
-    
     # Distribución de clusters
     print("\nDistribución de registros por cluster:")
     print(df['cluster'].value_counts().sort_index())
@@ -515,8 +510,6 @@ if modelo_kmeans is not None:
     stats = analizar_clusters(df[df['cluster'].notna()])
     if stats is not None:
         visualizar_clusters(stats)
-    # Guardar resultados
-    df.to_csv('datos_con_clusters.csv', index=False)
     
     # Filtrar solo registros con cluster asignado
     df_con_clusters = df[df['cluster'].notna()]
