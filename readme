@@ -1,3 +1,6 @@
+# Lab4 - Machine Learning solo el archivo Lab4_app.py
+#lo demás es del proyecto #3
+
 #instalar dependencias antes de ejectuar
 #pip install pandas numpy matplotlib seaborn scikit-learn openpyxl folium xgboost plotly geopy
 
