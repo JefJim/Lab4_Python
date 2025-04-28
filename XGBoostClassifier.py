@@ -275,8 +275,8 @@ HeatMap(heat_data, radius=25, blur=15).add_to(m)
 folium.LayerControl().add_to(m)
 
 # 6. Guardar mapa mejorado
-m.save('mapa_mortalidad_mejorado.html')
-print("\n✅ Mapa interactivo mejorado generado: 'mapa_mortalidad_mejorado.html'")
+m.save('mapa_mortalidad_provincias.html')
+print("\n✅ Mapa interactivo mejorado generado: 'mapa_mortalidad_provincias.html'")
 
 with open('Distritos_de_Costa_Rica.geojson', 'r', encoding='utf-8') as f:
     geojson_data = json.load(f)
@@ -708,5 +708,5 @@ folium.GeoJson(
 ).add_to(m_distritos)
 
 # Guardar el mapa
-m_distritos.save('mapa_mortalidad_por_distrito_final.html')
+m_distritos.save('mapa_mortalidad_distrito.html')
 print("✅ Mapa generado exitosamente: 'mapa_mortalidad_por_distrito_final.html'")
